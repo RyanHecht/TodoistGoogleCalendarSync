@@ -1,0 +1,104 @@
+#!/usr/bin/python3
+import yaml
+import requests
+import json
+import subprocess
+import os
+from datetime import datetime, timezone as tz
+from pytz import timezone as pytz
+
+with open("secrets.yml", "r") as secrets_file:
+    secrets = yaml.load(secrets_file)
+
+# Load Todoist token
+todoist_auth = secrets["todoist"]
+
+# Load timezone
+timezone = secrets["timezone"]
+
+# Load synchronization info
+sync_info = yaml.load(open("sync.yml", "r"))
+
+# Todoist sync token
+sync_token = sync_info["token"]
+
+
+
+def sync():
+    """
+    Returns the response from a Todoist incremental sync
+    (see: https://developer.todoist.com/sync/v7/#sync) for the
+    provided user token and sync token. Only tasks that have been
+    created/completed are returned.
+
+    Notable fields of the returning object:
+    items: array of task objects
+    sync_token: The sync token to give the next call to this function
+    """
+    url = "https://todoist.com/api/v7/sync"
+    post_data = {
+    'token': todoist_auth,
+    'sync_token': sync_token,
+    'resource_types': json.dumps(["items"]),
+    'commands': json.dumps([])
+    }
+
+    response = requests.post(url, post_data)
+
+    return response.json()
+
+def get_project_name(project_id):
+    url = "https://beta.todoist.com/API/v8/projects/" + str(project_id)
+    get_data = {
+    'token': todoist_auth
+    }
+    response = requests.get(url, get_data)
+    return response.json()["name"]
+
+def handle_items(items):
+    """
+    Returns a list of ids for which tasks were created
+    """
+
+    new_created_events = []
+    for item in items:
+        if item["due_date_utc"] is not None:
+            if item["checked"] == 0 and item["id"] not in sync_info["created"]:
+                new_created_events.append(item["id"])
+                handle_task_create(item)
+            if item["checked"] == 1:
+                handle_task_complete(item)
+    return new_created_events
+
+def handle_task_complete(task):
+    args=[]
+    args.append("./on-task-complete")
+    args.append(str(task["id"]))
+    subprocess.run(args, cwd=os.path.dirname(os.path.realpath(__file__)))
+
+def handle_task_create(task):
+    print(task)
+    duedate = datetime.strptime(task["due_date_utc"], "%a %d %b %Y %H:%M:%S %z")
+    duedate = duedate.replace(tzinfo=tz.utc).astimezone(tz=pytz(timezone))
+    args=[]
+    args.append("./on-task-create")
+    args.append(task["content"])
+    args.append(get_project_name(task["project_id"]))
+    args.append(
+    datetime.strftime(
+    duedate, "%Y-%m-%dT%H:%M:%S"))
+    args.append(str(task["id"]))
+    subprocess.run(args, cwd=os.path.dirname(os.path.realpath(__file__)))
+
+
+# Synchronize with Todoist
+response = sync()
+
+# Add newly created items to sync_info
+sync_info["created"] = sync_info["created"] + handle_items(response["items"])
+# Set the new sync token in sync info
+sync_info["token"] = response["sync_token"]
+
+# Write sync info to the file
+with open("sync.yml", "w") as sync_file:
+    yaml.dump(sync_info, sync_file, default_flow_style=False)

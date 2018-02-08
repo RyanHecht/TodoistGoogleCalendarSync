@@ -1,0 +1,31 @@
+#!/usr/bin/python3
+import sys
+import yaml
+from oauth2client import client
+from googleapiclient import sample_tools
+
+def main(argv):
+    with open("secrets.yml", "r") as secrets_file:
+        secrets = yaml.load(secrets_file)
+
+    # Authenticate and construct service.
+    service, flags = sample_tools.init(
+        [], 'calendar', 'v3', __doc__, __file__,
+        scope='https://www.googleapis.com/auth/calendar')
+
+    calendar_id = secrets["calendarId"]
+    task_id = argv[1]
+
+    try:
+        service.events().delete(
+        calendarId = calendar_id,
+        eventId = task_id
+        )
+
+
+    except client.AccessTokenRefreshError:
+        print('The credentials have been revoked or expired, please re-run'
+              'the application to re-authorize.')
+
+if __name__ == '__main__':
+    main(sys.argv)
