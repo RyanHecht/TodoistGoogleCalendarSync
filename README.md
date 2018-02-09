@@ -14,6 +14,7 @@ So, this project was born.
 
 
 ## Usage
+_Note: this was mostly intended for personal use, so this usage documentation is DEFINITELY not complete. If you want some help setting this up, feel free to reach out to me_
 
 In  `secrets.yml`, fill in the `todoist` field with the API key for your Todoist account.
 Then, fill in the `calendarId` field with the ID of the Google Calendar you wish to sync events with
