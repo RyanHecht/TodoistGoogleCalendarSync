@@ -17,11 +17,12 @@ def main(argv):
     task_id = argv[1]
 
     try:
-        service.events().delete(
+        req = service.events().delete(
         calendarId = calendar_id,
         eventId = task_id
         )
 
+        req.execute()
 
     except client.AccessTokenRefreshError:
         print('The credentials have been revoked or expired, please re-run'

@@ -34,10 +34,12 @@ def main(argv):
           "id": task_id
         }
 
-        service.events().insert(
+        req = service.events().insert(
         calendarId = calendar_id,
         body = task_body
         )
+
+        req.execute()
 
 
     except client.AccessTokenRefreshError:
